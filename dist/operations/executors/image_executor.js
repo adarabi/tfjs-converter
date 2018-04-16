@@ -5,7 +5,7 @@ var utils_1 = require("./utils");
 exports.executeOp = function (node, tensorMap) {
     switch (node.op) {
         case 'resizeBilinear': {
-            var images = utils_1.getParamValue('images', node, tensorMap);
+            var images = utils_1.getParamValue('image', node, tensorMap);
             var size = utils_1.getParamValue('size', node, tensorMap);
             var alignCorners = utils_1.getParamValue('alignCorners', node, tensorMap);
             return [tfc.image.resizeBilinear(images, [size[0], size[1]], alignCorners)];
