@@ -32,10 +32,11 @@ var normalization = require("./op_list/normalization.json");
 var reduction = require("./op_list/reduction.json");
 var sliceJoin = require("./op_list/slice_join.json");
 var transformation = require("./op_list/transformation.json");
+var image = require("./op_list/image.json");
 var CONTROL_FLOW_OPS = ['Switch', 'Merge', 'Enter', 'Exit', 'Next'];
 var OperationMapper = (function () {
     function OperationMapper() {
-        var mappersJson = __spread(arithmetic, basicMath, convolution, creation, logical, graph, matrices, normalization, reduction, sliceJoin, transformation);
+        var mappersJson = __spread(arithmetic, basicMath, convolution, creation, logical, graph, matrices, normalization, reduction, sliceJoin, transformation, image);
         this.opMappers = mappersJson.reduce(function (map, mapper) {
             map[mapper.tfOpName] = mapper;
             return map;
