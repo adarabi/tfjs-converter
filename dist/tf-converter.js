@@ -26487,6 +26487,12 @@ exports.executeOp = function (node, tensorMap) {
             var pad = utils_1.getParamValue('pad', node, tensorMap);
             return [tfc.conv2dTranspose(utils_1.getParamValue('x', node, tensorMap), utils_1.getParamValue('filter', node, tensorMap), shape, [stride[1], stride[2]], pad)];
         }
+        case 'conv2DBackpropInput': {
+            var shape = utils_1.getParamValue('outputShape', node, tensorMap);
+            var stride = utils_1.getParamValue('strides', node, tensorMap);
+            var pad = utils_1.getParamValue('pad', node, tensorMap);
+            return [tfc.conv2dTranspose(utils_1.getParamValue('x', node, tensorMap), utils_1.getParamValue('filter', node, tensorMap), shape, [stride[1], stride[2]], pad)];
+        }
         case 'depthwiseConv2d': {
             var stride = utils_1.getParamValue('strides', node, tensorMap);
             var pad = utils_1.getParamValue('pad', node, tensorMap);
@@ -26775,6 +26781,12 @@ exports.executeOp = function (node, tensorMap) {
             var begin = utils_1.getParamValue('begin', node, tensorMap);
             var size = utils_1.getParamValue('size', node, tensorMap);
             return [tfc.slice(utils_1.getParamValue('x', node, tensorMap), begin, size)];
+        }
+        case 'split': {
+            var axis = utils_1.getParamValue('axis', node, tensorMap);
+            var input = utils_1.getParamValue('x', node, tensorMap);
+            var numOrSizeSplits = utils_1.getParamValue('numOrSizeSplits', node, tensorMap);
+            return tfc.split(input, numOrSizeSplits, axis);
         }
         case 'stack': {
             var axis = utils_1.getParamValue('axis', node, tensorMap);
@@ -27691,6 +27703,44 @@ module.exports=[
   {
     "tfOpName": "Conv2DTranspose",
     "dlOpName": "conv2dTranspose",
+    "category": "convolution",
+    "params": [
+      {
+        "tfInputIndex": 0,
+        "dlParamName": "x",
+        "type": "tensor"
+      },
+      {
+        "tfInputIndex": 1,
+        "dlParamName": "filter",
+        "type": "tensor"
+      },
+      {
+        "tfParamName": "output_shape",
+        "dlParamName": "outputShape",
+        "type": "number[]"
+      },
+      {
+        "tfParamName": "strides",
+        "dlParamName": "strides",
+        "type": "number[]"
+      },
+      {
+        "tfParamName": "padding",
+        "dlParamName": "pad",
+        "type": "string"
+      },
+      {
+        "tfParamName": "data_format",
+        "dlParamName": "dataFormat",
+        "type": "string",
+        "notSupported": true
+      }
+    ]
+  },
+    {
+    "tfOpName": "Conv2DBackpropInput",
+    "dlOpName": "conv2DBackpropInput",
     "category": "convolution",
     "params": [
       {
@@ -28787,6 +28837,29 @@ module.exports=[
         "tfInputIndex": 0,
         "dlParamName": "axis",
         "type": "number"
+      }
+    ]
+  },
+    {
+    "tfOpName": "Split",
+    "dlOpName": "split",
+    "category": "slice_join",
+    "params": [
+      {
+        "tfInputIndex": 0,
+        "dlParamName": "x",
+        "type": "tensor"
+      },
+      {
+        "tfInputIndex": 1,
+        "dlParamName": "numOrSizeSplits",
+        "type": "tensor"
+      },
+      {
+        "tfParamName": "axis",
+        "dlParamName": "axis",
+        "type": "number",
+        "defaultValue": 0
       }
     ]
   },

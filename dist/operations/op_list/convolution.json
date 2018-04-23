@@ -209,6 +209,44 @@
       }
     ]
   },
+    {
+    "tfOpName": "Conv2DBackpropInput",
+    "dlOpName": "conv2DBackpropInput",
+    "category": "convolution",
+    "params": [
+      {
+        "tfInputIndex": 0,
+        "dlParamName": "x",
+        "type": "tensor"
+      },
+      {
+        "tfInputIndex": 1,
+        "dlParamName": "filter",
+        "type": "tensor"
+      },
+      {
+        "tfParamName": "output_shape",
+        "dlParamName": "outputShape",
+        "type": "number[]"
+      },
+      {
+        "tfParamName": "strides",
+        "dlParamName": "strides",
+        "type": "number[]"
+      },
+      {
+        "tfParamName": "padding",
+        "dlParamName": "pad",
+        "type": "string"
+      },
+      {
+        "tfParamName": "data_format",
+        "dlParamName": "dataFormat",
+        "type": "string",
+        "notSupported": true
+      }
+    ]
+  },
   {
     "tfOpName": "DepthwiseConv2d",
     "dlOpName": "depthwiseConv2d",

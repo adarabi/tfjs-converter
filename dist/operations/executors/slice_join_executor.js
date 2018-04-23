@@ -25,6 +25,12 @@ exports.executeOp = function (node, tensorMap) {
             var size = utils_1.getParamValue('size', node, tensorMap);
             return [tfc.slice(utils_1.getParamValue('x', node, tensorMap), begin, size)];
         }
+        case 'split': {
+            var axis = utils_1.getParamValue('axis', node, tensorMap);
+            var input = utils_1.getParamValue('x', node, tensorMap);
+            var numOrSizeSplits = utils_1.getParamValue('numOrSizeSplits', node, tensorMap);
+            return tfc.split(input, numOrSizeSplits, axis);
+        }
         case 'stack': {
             var axis = utils_1.getParamValue('axis', node, tensorMap);
             return [tfc.stack(utils_1.getParamValue('tensors', node, tensorMap), axis)];

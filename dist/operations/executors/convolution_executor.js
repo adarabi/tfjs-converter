@@ -26,6 +26,12 @@ exports.executeOp = function (node, tensorMap) {
             var pad = utils_1.getParamValue('pad', node, tensorMap);
             return [tfc.conv2dTranspose(utils_1.getParamValue('x', node, tensorMap), utils_1.getParamValue('filter', node, tensorMap), shape, [stride[1], stride[2]], pad)];
         }
+        case 'conv2DBackpropInput': {
+            var shape = utils_1.getParamValue('outputShape', node, tensorMap);
+            var stride = utils_1.getParamValue('strides', node, tensorMap);
+            var pad = utils_1.getParamValue('pad', node, tensorMap);
+            return [tfc.conv2dTranspose(utils_1.getParamValue('x', node, tensorMap), utils_1.getParamValue('filter', node, tensorMap), shape, [stride[1], stride[2]], pad)];
+        }
         case 'depthwiseConv2d': {
             var stride = utils_1.getParamValue('strides', node, tensorMap);
             var pad = utils_1.getParamValue('pad', node, tensorMap);
