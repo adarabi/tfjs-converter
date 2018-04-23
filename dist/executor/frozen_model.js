@@ -154,9 +154,32 @@ var FrozenModel = (function () {
         });
     };
     FrozenModel.prototype.execute = function (inputs, outputs) {
+        if (this.executor.isControlFlowModel) {
+            throw new Error('The model contains control flow ops, ' +
+                'please use executeAsync method');
+        }
         var result = this.executor.execute(this.convertTensorMapToTensorsMap(inputs), outputs);
         var keys = Object.keys(result);
         return (keys.length === 1) ? result[keys[0]] : result;
+    };
+    FrozenModel.prototype.executeAsync = function (inputs, outputs) {
+        return __awaiter(this, void 0, void 0, function () {
+            var result, keys;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        if (!this.executor.isControlFlowModel) {
+                            throw new Error('The model does not contain control flow ops, ' +
+                                'please use execute method for better performance.');
+                        }
+                        return [4, this.executor.executeAsync(this.convertTensorMapToTensorsMap(inputs), outputs)];
+                    case 1:
+                        result = _a.sent();
+                        keys = Object.keys(result);
+                        return [2, (keys.length === 1) ? result[keys[0]] : result];
+                }
+            });
+        });
     };
     FrozenModel.prototype.convertTensorMapToTensorsMap = function (map) {
         return Object.keys(map).reduce(function (newMap, key) {

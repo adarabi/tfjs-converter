@@ -15,6 +15,7 @@ export declare class FrozenModel {
     private loadWeightManifest();
     load(): Promise<boolean>;
     execute(inputs: NamedTensorMap, outputs?: string | string[]): tfc.Tensor | NamedTensorMap;
+    executeAsync(inputs: NamedTensorMap, outputs?: string | string[]): Promise<tfc.Tensor | NamedTensorMap>;
     private convertTensorMapToTensorsMap(map);
     dispose(): void;
 }

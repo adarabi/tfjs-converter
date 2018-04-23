@@ -2,25 +2,25 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
 var utils_1 = require("./utils");
-exports.executeOp = function (node, tensorMap) {
+exports.executeOp = function (node, tensorMap, context) {
     switch (node.op) {
         case 'const': {
             return tensorMap[node.name];
         }
         case 'placeholder':
-            var def = utils_1.getParamValue('default', node, tensorMap);
-            return [utils_1.getTensor(node.name, tensorMap) || def];
+            var def = utils_1.getParamValue('default', node, tensorMap, context);
+            return [utils_1.getTensor(node.name, tensorMap, context) || def];
         case 'identity':
-            return [utils_1.getParamValue('x', node, tensorMap)];
+            return [utils_1.getParamValue('x', node, tensorMap, context)];
         case 'shape':
-            return [tfc.tensor1d(utils_1.getParamValue('x', node, tensorMap).shape, 'int32')];
+            return [tfc.tensor1d(utils_1.getParamValue('x', node, tensorMap, context).shape, 'int32')];
         case 'noop':
             return [];
         case 'print':
-            var input = utils_1.getParamValue('x', node, tensorMap);
-            var data = utils_1.getParamValue('data', node, tensorMap);
-            var message = utils_1.getParamValue('message', node, tensorMap);
-            var summarize = utils_1.getParamValue('summarize', node, tensorMap);
+            var input = utils_1.getParamValue('x', node, tensorMap, context);
+            var data = utils_1.getParamValue('data', node, tensorMap, context);
+            var message = utils_1.getParamValue('message', node, tensorMap, context);
+            var summarize = utils_1.getParamValue('summarize', node, tensorMap, context);
             console.warn('The graph has a tf.print() operation,' +
                 'usually used for debugging, which slows down performance.');
             console.log(message);

@@ -2,12 +2,12 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
 var utils_1 = require("./utils");
-exports.executeOp = function (node, tensorMap) {
+exports.executeOp = function (node, tensorMap, context) {
     switch (node.op) {
         case 'resizeBilinear': {
-            var images = utils_1.getParamValue('image', node, tensorMap);
-            var size = utils_1.getParamValue('size', node, tensorMap);
-            var alignCorners = utils_1.getParamValue('alignCorners', node, tensorMap);
+            var images = utils_1.getParamValue('images', node, tensorMap, context);
+            var size = utils_1.getParamValue('size', node, tensorMap, context);
+            var alignCorners = utils_1.getParamValue('alignCorners', node, tensorMap, context);
             return [tfc.image.resizeBilinear(images, [size[0], size[1]], alignCorners)];
         }
         default:

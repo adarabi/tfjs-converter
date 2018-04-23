@@ -21,8 +21,10 @@ var __spread = (this && this.__spread) || function () {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 var index_1 = require("../data/index");
+var utils_1 = require("./executors/utils");
 var arithmetic = require("./op_list/arithmetic.json");
 var basicMath = require("./op_list/basic_math.json");
+var control = require("./op_list/control.json");
 var convolution = require("./op_list/convolution.json");
 var creation = require("./op_list/creation.json");
 var graph = require("./op_list/graph.json");
@@ -32,11 +34,10 @@ var normalization = require("./op_list/normalization.json");
 var reduction = require("./op_list/reduction.json");
 var sliceJoin = require("./op_list/slice_join.json");
 var transformation = require("./op_list/transformation.json");
-var image = require("./op_list/image.json");
-var CONTROL_FLOW_OPS = ['Switch', 'Merge', 'Enter', 'Exit', 'Next'];
+var CONTROL_FLOW_OPS = ['Switch', 'Merge', 'Enter', 'Exit', 'NextIteration'];
 var OperationMapper = (function () {
     function OperationMapper() {
-        var mappersJson = __spread(arithmetic, basicMath, convolution, creation, logical, graph, matrices, normalization, reduction, sliceJoin, transformation, image);
+        var mappersJson = __spread(arithmetic, basicMath, control, convolution, creation, logical, graph, matrices, normalization, reduction, sliceJoin, transformation);
         this.opMappers = mappersJson.reduce(function (map, mapper) {
             map[mapper.tfOpName] = mapper;
             return map;
@@ -70,8 +71,9 @@ var OperationMapper = (function () {
         Object.keys(nodes).forEach(function (key) {
             var node = nodes[key];
             node.inputNames.forEach(function (name) {
-                node.inputs.push(nodes[name]);
-                nodes[name].children.push(node);
+                var _a = __read(utils_1.getNodeNameAndIndex(name), 1), nodeName = _a[0];
+                node.inputs.push(nodes[nodeName]);
+                nodes[nodeName].children.push(node);
             });
             if (node.inputs.length === 0)
                 inputs.push(node);
@@ -93,7 +95,8 @@ var OperationMapper = (function () {
             name: node.name,
             op: mapper.dlOpName,
             category: mapper.category,
-            inputNames: node.input || [],
+            inputNames: (node.input ||
+                []).map(function (input) { return input.startsWith('^') ? input.substr(1) : input; }),
             inputs: [],
             children: [],
             params: {}

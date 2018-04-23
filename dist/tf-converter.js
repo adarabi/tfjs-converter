@@ -26029,6 +26029,104 @@ __export(require("./compiled_api"));
 
 },{"./compiled_api":122}],124:[function(require,module,exports){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+var ExecutionContext = (function () {
+    function ExecutionContext(weightMap) {
+        this.weightMap = weightMap;
+        this.rootContext = { id: 0, frameName: '', iterationId: 0 };
+        this.contexts = [this.rootContext];
+        this.lastId = 0;
+        this.generateCurrentContextIds();
+    }
+    ExecutionContext.prototype.newFrame = function (id, frameName) {
+        return { id: id, frameName: frameName, iterationId: 0 };
+    };
+    Object.defineProperty(ExecutionContext.prototype, "currentContext", {
+        get: function () {
+            return this.contexts;
+        },
+        set: function (contexts) {
+            if (this.contexts !== contexts) {
+                this.contexts = contexts;
+                this.generateCurrentContextIds();
+            }
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(ExecutionContext.prototype, "currentContextId", {
+        get: function () {
+            return this._currentContextIds[0];
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(ExecutionContext.prototype, "currentContextIds", {
+        get: function () {
+            return this._currentContextIds;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    ExecutionContext.prototype.generateCurrentContextIds = function () {
+        var names = [];
+        for (var i = 0; i < this.contexts.length - 1; i++) {
+            var contexts = this.contexts.slice(0, this.contexts.length - i);
+            names.push(this.contextIdforContexts(contexts));
+        }
+        names.push('');
+        this._currentContextIds = names;
+    };
+    ExecutionContext.prototype.contextIdforContexts = function (contexts) {
+        return contexts ?
+            contexts
+                .map(function (context) { return (context.id === 0 && context.iterationId === 0) ?
+                '' :
+                context.frameName + "-" + context.iterationId; })
+                .join('/') :
+            '';
+    };
+    ExecutionContext.prototype.enterFrame = function (frameId) {
+        if (this.contexts) {
+            this.lastId++;
+            this.contexts = this.contexts.slice();
+            this.contexts.push(this.newFrame(this.lastId, frameId));
+            this._currentContextIds.unshift(this.contextIdforContexts(this.contexts));
+        }
+    };
+    ExecutionContext.prototype.exitFrame = function () {
+        if (this.contexts && this.contexts.length > 1) {
+            this.contexts = this.contexts.slice();
+            this.contexts.splice(-1);
+            this.currentContextIds.shift();
+        }
+        else {
+            throw new Error('Cannot exit frame, the context is empty');
+        }
+    };
+    ExecutionContext.prototype.nextIteration = function () {
+        if (this.contexts && this.contexts.length > 0) {
+            this.contexts = this.contexts.slice();
+            this.lastId++;
+            var context = Object.assign({}, this.contexts[this.contexts.length - 1]);
+            context.iterationId += 1;
+            context.id = this.lastId;
+            this.contexts.splice(-1, 1, context);
+            this._currentContextIds.splice(0, 1, this.contextIdforContexts(this.contexts));
+        }
+        else {
+            throw new Error('Cannot increase frame iteration, the context is empty');
+        }
+    };
+    ExecutionContext.prototype.getWeight = function (name) {
+        return this.weightMap[name];
+    };
+    return ExecutionContext;
+}());
+exports.ExecutionContext = ExecutionContext;
+
+},{}],125:[function(require,module,exports){
+"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
@@ -26184,9 +26282,32 @@ var FrozenModel = (function () {
         });
     };
     FrozenModel.prototype.execute = function (inputs, outputs) {
+        if (this.executor.isControlFlowModel) {
+            throw new Error('The model contains control flow ops, ' +
+                'please use executeAsync method');
+        }
         var result = this.executor.execute(this.convertTensorMapToTensorsMap(inputs), outputs);
         var keys = Object.keys(result);
         return (keys.length === 1) ? result[keys[0]] : result;
+    };
+    FrozenModel.prototype.executeAsync = function (inputs, outputs) {
+        return __awaiter(this, void 0, void 0, function () {
+            var result, keys;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        if (!this.executor.isControlFlowModel) {
+                            throw new Error('The model does not contain control flow ops, ' +
+                                'please use execute method for better performance.');
+                        }
+                        return [4, this.executor.executeAsync(this.convertTensorMapToTensorsMap(inputs), outputs)];
+                    case 1:
+                        result = _a.sent();
+                        keys = Object.keys(result);
+                        return [2, (keys.length === 1) ? result[keys[0]] : result];
+                }
+            });
+        });
     };
     FrozenModel.prototype.convertTensorMapToTensorsMap = function (map) {
         return Object.keys(map).reduce(function (newMap, key) {
@@ -26217,7 +26338,7 @@ function loadFrozenModel(modelUrl, weightsManifestUrl, requestOption) {
 }
 exports.loadFrozenModel = loadFrozenModel;
 
-},{"../data/index":123,"../operations/index":141,"./graph_executor":125,"@tensorflow/tfjs-core":16}],125:[function(require,module,exports){
+},{"../data/index":123,"../operations/index":143,"./graph_executor":126,"@tensorflow/tfjs-core":16}],126:[function(require,module,exports){
 "use strict";
 var __assign = (this && this.__assign) || Object.assign || function(t) {
     for (var s, i = 1, n = arguments.length; i < n; i++) {
@@ -26226,6 +26347,41 @@ var __assign = (this && this.__assign) || Object.assign || function(t) {
             t[p] = s[p];
     }
     return t;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __generator = (this && this.__generator) || function (thisArg, body) {
+    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
+    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+    function verb(n) { return function (v) { return step([n, v]); }; }
+    function step(op) {
+        if (f) throw new TypeError("Generator is already executing.");
+        while (_) try {
+            if (f = 1, y && (t = y[op[0] & 2 ? "return" : op[0] ? "throw" : "next"]) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [0, t.value];
+            switch (op[0]) {
+                case 0: case 1: t = op; break;
+                case 4: _.label++; return { value: op[1], done: false };
+                case 5: _.label++; y = op[1]; op = [0]; continue;
+                case 7: op = _.ops.pop(); _.trys.pop(); continue;
+                default:
+                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
+                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
+                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
+                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
+                    if (t[2]) _.ops.pop();
+                    _.trys.pop(); continue;
+            }
+            op = body.call(thisArg, _);
+        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
+        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
+    }
 };
 var __read = (this && this.__read) || function (o, n) {
     var m = typeof Symbol === "function" && o[Symbol.iterator];
@@ -26251,6 +26407,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var tfjs_core_1 = require("@tensorflow/tfjs-core");
 var utils_1 = require("../operations/executors/utils");
 var operations = require("../operations/index");
+var execution_context_1 = require("./execution_context");
 var GraphExecutor = (function () {
     function GraphExecutor(graph) {
         this.graph = graph;
@@ -26265,6 +26422,8 @@ var GraphExecutor = (function () {
             return this._weightMap;
         },
         set: function (weightMap) {
+            var weightIds = Object.keys(weightMap).map(function (key) { return weightMap[key].map(function (tensor) { return tensor.id; }); });
+            this.weightIds = [].concat.apply([], weightIds);
             this._weightMap = weightMap;
         },
         enumerable: true,
@@ -26284,7 +26443,17 @@ var GraphExecutor = (function () {
         enumerable: true,
         configurable: true
     });
+    Object.defineProperty(GraphExecutor.prototype, "isControlFlowModel", {
+        get: function () {
+            return this.graph.withControlFlow;
+        },
+        enumerable: true,
+        configurable: true
+    });
     GraphExecutor.prototype.compile = function () {
+        if (this.graph.withControlFlow) {
+            return;
+        }
         var stack = __spread(this.graph.inputs);
         var visited = {};
         while (stack.length > 0) {
@@ -26292,7 +26461,10 @@ var GraphExecutor = (function () {
             visited[node.name] = true;
             this.compiledOrder.push(node);
             node.children.forEach(function (childNode) {
-                if (childNode.inputNames.every(function (name) { return visited[name]; })) {
+                if (!visited[childNode.name] && childNode.inputNames.every(function (name) {
+                    var _a = __read(utils_1.getNodeNameAndIndex(name), 1), nodeName = _a[0];
+                    return visited[nodeName];
+                })) {
                     stack.push(childNode);
                 }
             });
@@ -26302,20 +26474,103 @@ var GraphExecutor = (function () {
         var _this = this;
         this.checkInput(inputs);
         var result = tfjs_core_1.tidy(function () {
+            var context = new execution_context_1.ExecutionContext(_this._weightMap);
             var tensors = _this.compiledOrder.reduce(function (map, node) {
-                map[node.name] = operations.executeOp(node, map);
+                map[node.name] =
+                    operations.executeOp(node, map, context);
                 return map;
             }, __assign({}, _this.weightMap, inputs));
-            if (outputs && !(outputs instanceof Array)) {
-                outputs = [outputs];
-            }
-            var requestedOutputs = (outputs || _this.graph.outputs.map(function (node) { return node.name; }));
-            return requestedOutputs.reduce(function (map, name) {
-                map[name] = utils_1.getTensor(name, tensors);
-                return map;
-            }, {});
+            return _this.findOutputs(tensors, context, outputs);
         });
         return result;
+    };
+    GraphExecutor.prototype.executeAsync = function (inputs, outputs) {
+        return __awaiter(this, void 0, void 0, function () {
+            var _this = this;
+            var context, tensors, results, outputIds, inputIdArray, inputIds;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        context = new execution_context_1.ExecutionContext(this._weightMap);
+                        return [4, this.executeWithControlFlow(inputs, context)];
+                    case 1:
+                        tensors = _a.sent();
+                        results = this.findOutputs(tensors, context, outputs);
+                        outputIds = Object.keys(results).map(function (key) { return results[key].id; });
+                        inputIdArray = Object.keys(inputs).map(function (key) { return inputs[key].map(function (input) { return input.id; }); });
+                        inputIds = [].concat.apply([], inputIdArray);
+                        Object.keys(tensors).forEach(function (key) {
+                            var tensorArray = tensors[key];
+                            tensorArray.forEach(function (tensor) {
+                                if (tensor && outputIds.indexOf(tensor.id) === -1 &&
+                                    inputIds.indexOf(tensor.id) === -1 &&
+                                    _this.weightIds.indexOf(tensor.id) === -1) {
+                                    tensor.dispose();
+                                }
+                            });
+                        });
+                        return [2, results];
+                }
+            });
+        });
+    };
+    GraphExecutor.prototype.executeWithControlFlow = function (inputs, context) {
+        return __awaiter(this, void 0, void 0, function () {
+            var stack, tensorMap, added, item, tensors, _a, nodeName, _b, _c;
+            return __generator(this, function (_d) {
+                switch (_d.label) {
+                    case 0:
+                        stack = this.graph.inputs.map(function (node) {
+                            return { node: node, contexts: context.currentContext };
+                        });
+                        tensorMap = __assign({}, this.weightMap, inputs);
+                        added = {};
+                        _d.label = 1;
+                    case 1:
+                        if (!(stack.length > 0)) return [3, 3];
+                        item = stack.pop();
+                        context.currentContext = item.contexts;
+                        tensors = operations.executeOp(item.node, tensorMap, context);
+                        _a = __read(utils_1.getNodeNameAndIndex(item.node.name, context), 1), nodeName = _a[0];
+                        _b = tensorMap;
+                        _c = nodeName;
+                        return [4, tensors];
+                    case 2:
+                        _b[_c] = _d.sent();
+                        item.node.children.forEach(function (childNode) {
+                            var _a = __read(utils_1.getNodeNameAndIndex(childNode.name, context), 1), nodeName = _a[0];
+                            if (!added[nodeName]) {
+                                if (childNode.op === 'merge') {
+                                    if (childNode.inputNames.some(function (name) {
+                                        return !!utils_1.getTensor(name, tensorMap, context);
+                                    })) {
+                                        added[nodeName] = true;
+                                        stack.push({ contexts: context.currentContext, node: childNode });
+                                    }
+                                }
+                                else if (childNode.inputNames.every(function (name) {
+                                    return !!utils_1.getTensor(name, tensorMap, context);
+                                })) {
+                                    added[nodeName] = true;
+                                    stack.push({ contexts: context.currentContext, node: childNode });
+                                }
+                            }
+                        });
+                        return [3, 1];
+                    case 3: return [2, tensorMap];
+                }
+            });
+        });
+    };
+    GraphExecutor.prototype.findOutputs = function (tensorMap, context, outputs) {
+        if (outputs && !(outputs instanceof Array)) {
+            outputs = [outputs];
+        }
+        var requestedOutputs = (outputs || this.graph.outputs.map(function (node) { return node.name; }));
+        return requestedOutputs.reduce(function (map, name) {
+            map[name] = utils_1.getTensor(name, tensorMap, context);
+            return map;
+        }, {});
     };
     GraphExecutor.prototype.dispose = function () {
         var _this = this;
@@ -26346,7 +26601,7 @@ var GraphExecutor = (function () {
 }());
 exports.GraphExecutor = GraphExecutor;
 
-},{"../operations/executors/utils":140,"../operations/index":141,"@tensorflow/tfjs-core":16}],126:[function(require,module,exports){
+},{"../operations/executors/utils":142,"../operations/index":143,"./execution_context":124,"@tensorflow/tfjs-core":16}],127:[function(require,module,exports){
 "use strict";
 function __export(m) {
     for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
@@ -26354,8 +26609,9 @@ function __export(m) {
 Object.defineProperty(exports, "__esModule", { value: true });
 __export(require("./graph_executor"));
 __export(require("./frozen_model"));
+__export(require("./execution_context"));
 
-},{"./frozen_model":124,"./graph_executor":125}],127:[function(require,module,exports){
+},{"./execution_context":124,"./frozen_model":125,"./graph_executor":126}],128:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var index_1 = require("./executor/index");
@@ -26364,32 +26620,32 @@ exports.loadFrozenModel = index_1.loadFrozenModel;
 var version_1 = require("./version");
 exports.version_converter = version_1.version;
 
-},{"./executor/index":126,"./version":156}],128:[function(require,module,exports){
+},{"./executor/index":127,"./version":158}],129:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
 var utils_1 = require("./utils");
-exports.executeOp = function (node, tensorMap) {
+exports.executeOp = function (node, tensorMap, context) {
     switch (node.op) {
         case 'add': {
-            return [tfc.add(utils_1.getParamValue('a', node, tensorMap), utils_1.getParamValue('b', node, tensorMap))];
+            return [tfc.add(utils_1.getParamValue('a', node, tensorMap, context), utils_1.getParamValue('b', node, tensorMap, context))];
         }
         case 'mul':
-            return [tfc.mul(utils_1.getParamValue('a', node, tensorMap), utils_1.getParamValue('b', node, tensorMap))];
+            return [tfc.mul(utils_1.getParamValue('a', node, tensorMap, context), utils_1.getParamValue('b', node, tensorMap, context))];
         case 'div': {
-            return [tfc.div(utils_1.getParamValue('a', node, tensorMap), utils_1.getParamValue('b', node, tensorMap))];
+            return [tfc.div(utils_1.getParamValue('a', node, tensorMap, context), utils_1.getParamValue('b', node, tensorMap, context))];
         }
         case 'sub': {
-            return [tfc.sub(utils_1.getParamValue('a', node, tensorMap), utils_1.getParamValue('b', node, tensorMap))];
+            return [tfc.sub(utils_1.getParamValue('a', node, tensorMap, context), utils_1.getParamValue('b', node, tensorMap, context))];
         }
         case 'minimum': {
-            return [tfc.minimum(utils_1.getParamValue('a', node, tensorMap), utils_1.getParamValue('b', node, tensorMap))];
+            return [tfc.minimum(utils_1.getParamValue('a', node, tensorMap, context), utils_1.getParamValue('b', node, tensorMap, context))];
         }
         case 'maximum': {
-            return [tfc.maximum(utils_1.getParamValue('a', node, tensorMap), utils_1.getParamValue('b', node, tensorMap))];
+            return [tfc.maximum(utils_1.getParamValue('a', node, tensorMap, context), utils_1.getParamValue('b', node, tensorMap, context))];
         }
         case 'pow': {
-            return [tfc.pow(utils_1.getParamValue('a', node, tensorMap), utils_1.getParamValue('b', node, tensorMap))];
+            return [tfc.pow(utils_1.getParamValue('a', node, tensorMap, context), utils_1.getParamValue('b', node, tensorMap, context))];
         }
         default:
             throw TypeError("Node type " + node.op + " is not implemented");
@@ -26397,121 +26653,204 @@ exports.executeOp = function (node, tensorMap) {
 };
 exports.CATEGORY = 'arithmetic';
 
-},{"./utils":140,"@tensorflow/tfjs-core":16}],129:[function(require,module,exports){
+},{"./utils":142,"@tensorflow/tfjs-core":16}],130:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
 var utils_1 = require("./utils");
-exports.executeOp = function (node, tensorMap) {
+exports.executeOp = function (node, tensorMap, context) {
     switch (node.op) {
         case 'abs':
-            return [tfc.abs(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.abs(utils_1.getParamValue('x', node, tensorMap, context))];
         case 'acos':
-            return [tfc.acos(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.acos(utils_1.getParamValue('x', node, tensorMap, context))];
         case 'asin':
-            return [tfc.asin(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.asin(utils_1.getParamValue('x', node, tensorMap, context))];
         case 'atan':
-            return [tfc.atan(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.atan(utils_1.getParamValue('x', node, tensorMap, context))];
         case 'ceil':
-            return [tfc.ceil(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.ceil(utils_1.getParamValue('x', node, tensorMap, context))];
         case 'cos':
-            return [tfc.cos(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.cos(utils_1.getParamValue('x', node, tensorMap, context))];
         case 'cosh':
-            return [tfc.cosh(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.cosh(utils_1.getParamValue('x', node, tensorMap, context))];
         case 'elu':
-            return [tfc.elu(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.elu(utils_1.getParamValue('x', node, tensorMap, context))];
         case 'exp':
-            return [tfc.exp(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.exp(utils_1.getParamValue('x', node, tensorMap, context))];
         case 'floor':
-            return [tfc.floor(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.floor(utils_1.getParamValue('x', node, tensorMap, context))];
         case 'log':
-            return [tfc.log(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.log(utils_1.getParamValue('x', node, tensorMap, context))];
         case 'relu':
-            return [tfc.relu(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.relu(utils_1.getParamValue('x', node, tensorMap, context))];
         case 'selu':
-            return [tfc.selu(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.selu(utils_1.getParamValue('x', node, tensorMap, context))];
         case 'sigmoid':
-            return [tfc.sigmoid(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.sigmoid(utils_1.getParamValue('x', node, tensorMap, context))];
         case 'sin':
-            return [tfc.sin(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.sin(utils_1.getParamValue('x', node, tensorMap, context))];
         case 'sinh': {
-            return [tfc.sinh(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.sinh(utils_1.getParamValue('x', node, tensorMap, context))];
         }
         case 'sqrt': {
-            return [tfc.sqrt(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.sqrt(utils_1.getParamValue('x', node, tensorMap, context))];
         }
         case 'square': {
-            return [tfc.square(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.square(utils_1.getParamValue('x', node, tensorMap, context))];
         }
         case 'tanh': {
-            return [tfc.tanh(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.tanh(utils_1.getParamValue('x', node, tensorMap, context))];
         }
         case 'tan':
-            return [tfc.tan(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.tan(utils_1.getParamValue('x', node, tensorMap, context))];
         case 'clipByValue':
-            return [tfc.clipByValue(utils_1.getParamValue('x', node, tensorMap), utils_1.getParamValue('clipValueMin', node, tensorMap), utils_1.getParamValue('clipValueMax', node, tensorMap))];
+            return [tfc.clipByValue(utils_1.getParamValue('x', node, tensorMap, context), utils_1.getParamValue('clipValueMin', node, tensorMap, context), utils_1.getParamValue('clipValueMax', node, tensorMap, context))];
         case 'rsqrt':
-            return [tfc.div(tfc.scalar(1.0, 'float32'), tfc.sqrt(utils_1.getTensor(node.inputNames[0], tensorMap)))];
+            return [tfc.div(tfc.scalar(1.0, 'float32'), tfc.sqrt(utils_1.getTensor(node.inputNames[0], tensorMap, context)))];
         default:
             throw TypeError("Node type " + node.op + " is not implemented");
     }
 };
 exports.CATEGORY = 'basic_math';
 
-},{"./utils":140,"@tensorflow/tfjs-core":16}],130:[function(require,module,exports){
+},{"./utils":142,"@tensorflow/tfjs-core":16}],131:[function(require,module,exports){
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __generator = (this && this.__generator) || function (thisArg, body) {
+    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
+    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+    function verb(n) { return function (v) { return step([n, v]); }; }
+    function step(op) {
+        if (f) throw new TypeError("Generator is already executing.");
+        while (_) try {
+            if (f = 1, y && (t = y[op[0] & 2 ? "return" : op[0] ? "throw" : "next"]) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [0, t.value];
+            switch (op[0]) {
+                case 0: case 1: t = op; break;
+                case 4: _.label++; return { value: op[1], done: false };
+                case 5: _.label++; y = op[1]; op = [0]; continue;
+                case 7: op = _.ops.pop(); _.trys.pop(); continue;
+                default:
+                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
+                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
+                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
+                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
+                    if (t[2]) _.ops.pop();
+                    _.trys.pop(); continue;
+            }
+            op = body.call(thisArg, _);
+        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
+        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
+    }
+};
+var _this = this;
+Object.defineProperty(exports, "__esModule", { value: true });
+var utils_1 = require("./utils");
+exports.executeOp = function (node, tensorMap, context) { return __awaiter(_this, void 0, void 0, function () {
+    var _a, pred, data_1, inputName, frameId, data, tensor, input;
+    return __generator(this, function (_b) {
+        switch (_b.label) {
+            case 0:
+                _a = node.op;
+                switch (_a) {
+                    case 'loopCond': return [3, 1];
+                    case 'switch': return [3, 2];
+                    case 'merge': return [3, 4];
+                    case 'enter': return [3, 5];
+                    case 'exit': return [3, 6];
+                    case 'nextIteration': return [3, 7];
+                }
+                return [3, 8];
+            case 1: return [2, [utils_1.getParamValue('pred', node, tensorMap, context)]];
+            case 2:
+                pred = utils_1.getParamValue('pred', node, tensorMap, context);
+                data_1 = utils_1.getParamValue('data', node, tensorMap, context);
+                return [4, pred.data()];
+            case 3: return [2, (_b.sent())[0] ? [undefined, data_1] : [data_1, undefined]];
+            case 4:
+                inputName = node.inputNames.find(function (name) { return utils_1.getTensor(name, tensorMap, context) !== undefined; });
+                return [2, inputName ? [utils_1.getTensor(inputName, tensorMap, context)] : undefined];
+            case 5:
+                frameId = utils_1.getParamValue('frameName', node, tensorMap, context);
+                data = utils_1.getParamValue('tensor', node, tensorMap, context);
+                context.enterFrame(frameId);
+                return [2, [data]];
+            case 6:
+                tensor = utils_1.getParamValue('tensor', node, tensorMap, context);
+                context.exitFrame();
+                return [2, [tensor]];
+            case 7:
+                input = utils_1.getParamValue('tensor', node, tensorMap, context);
+                context.nextIteration();
+                return [2, [input]];
+            case 8: throw TypeError("Node type " + node.op + " is not implemented");
+        }
+    });
+}); };
+exports.CATEGORY = 'control';
+
+},{"./utils":142}],132:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
 var utils_1 = require("./utils");
-exports.executeOp = function (node, tensorMap) {
+exports.executeOp = function (node, tensorMap, context) {
     switch (node.op) {
         case 'conv1d': {
-            var stride = utils_1.getParamValue('stride', node, tensorMap);
-            var pad = utils_1.getParamValue('pad', node, tensorMap);
-            var dataFormat = utils_1.getParamValue('dataFormat', node, tensorMap)
+            var stride = utils_1.getParamValue('stride', node, tensorMap, context);
+            var pad = utils_1.getParamValue('pad', node, tensorMap, context);
+            var dataFormat = utils_1.getParamValue('dataFormat', node, tensorMap, context)
                 .toUpperCase();
-            var dilation = utils_1.getParamValue('dilation', node, tensorMap);
-            return [tfc.conv1d(utils_1.getParamValue('x', node, tensorMap), utils_1.getParamValue('filter', node, tensorMap), stride, pad, dataFormat, dilation)];
+            var dilation = utils_1.getParamValue('dilation', node, tensorMap, context);
+            return [tfc.conv1d(utils_1.getParamValue('x', node, tensorMap, context), utils_1.getParamValue('filter', node, tensorMap, context), stride, pad, dataFormat, dilation)];
         }
         case 'conv2d': {
-            var stride = utils_1.getParamValue('strides', node, tensorMap);
-            var pad = utils_1.getParamValue('pad', node, tensorMap);
-            var dataFormat = utils_1.getParamValue('dataFormat', node, tensorMap)
+            var stride = utils_1.getParamValue('strides', node, tensorMap, context);
+            var pad = utils_1.getParamValue('pad', node, tensorMap, context);
+            var dataFormat = utils_1.getParamValue('dataFormat', node, tensorMap, context)
                 .toUpperCase();
-            var dilations = utils_1.getParamValue('dilations', node, tensorMap);
-            return [tfc.conv2d(utils_1.getParamValue('x', node, tensorMap), utils_1.getParamValue('filter', node, tensorMap), [stride[1], stride[2]], pad, dataFormat, [dilations[0], dilations[1]])];
+            var dilations = utils_1.getParamValue('dilations', node, tensorMap, context);
+            return [tfc.conv2d(utils_1.getParamValue('x', node, tensorMap, context), utils_1.getParamValue('filter', node, tensorMap, context), [stride[1], stride[2]], pad, dataFormat, [dilations[0], dilations[1]])];
         }
         case 'conv2dTranspose': {
-            var shape = utils_1.getParamValue('outputShape', node, tensorMap);
-            var stride = utils_1.getParamValue('strides', node, tensorMap);
-            var pad = utils_1.getParamValue('pad', node, tensorMap);
-            return [tfc.conv2dTranspose(utils_1.getParamValue('x', node, tensorMap), utils_1.getParamValue('filter', node, tensorMap), shape, [stride[1], stride[2]], pad)];
+            var shape = utils_1.getParamValue('outputShape', node, tensorMap, context);
+            var stride = utils_1.getParamValue('strides', node, tensorMap, context);
+            var pad = utils_1.getParamValue('pad', node, tensorMap, context);
+            return [tfc.conv2dTranspose(utils_1.getParamValue('x', node, tensorMap, context), utils_1.getParamValue('filter', node, tensorMap, context), shape, [stride[1], stride[2]], pad)];
         }
         case 'conv2DBackpropInput': {
-            var shape = utils_1.getParamValue('outputShape', node, tensorMap);
-            var stride = utils_1.getParamValue('strides', node, tensorMap);
-            var pad = utils_1.getParamValue('pad', node, tensorMap);
-            return [tfc.conv2dTranspose(utils_1.getParamValue('x', node, tensorMap), utils_1.getParamValue('filter', node, tensorMap), shape, [stride[1], stride[2]], pad)];
+            var shape = utils_1.getParamValue('outputShape', node, tensorMap, context);
+            var stride = utils_1.getParamValue('strides', node, tensorMap, context);
+            var pad = utils_1.getParamValue('pad', node, tensorMap, context);
+            return [tfc.conv2dTranspose(utils_1.getParamValue('x', node, tensorMap, context), utils_1.getParamValue('filter', node, tensorMap, context), shape, [stride[1], stride[2]], pad)];
         }
         case 'depthwiseConv2d': {
-            var stride = utils_1.getParamValue('strides', node, tensorMap);
-            var pad = utils_1.getParamValue('pad', node, tensorMap);
-            var dilations = utils_1.getParamValue('dilations', node, tensorMap);
-            var dataFormat = utils_1.getParamValue('dataFormat', node, tensorMap)
+            var stride = utils_1.getParamValue('strides', node, tensorMap, context);
+            var pad = utils_1.getParamValue('pad', node, tensorMap, context);
+            var dilations = utils_1.getParamValue('dilations', node, tensorMap, context);
+            var dataFormat = utils_1.getParamValue('dataFormat', node, tensorMap, context)
                 .toUpperCase();
-            return [tfc.depthwiseConv2d(utils_1.getParamValue('input', node, tensorMap), utils_1.getParamValue('filter', node, tensorMap), [stride[1], stride[2]], pad, dataFormat, [dilations[0], dilations[1]])];
+            return [tfc.depthwiseConv2d(utils_1.getParamValue('input', node, tensorMap, context), utils_1.getParamValue('filter', node, tensorMap, context), [stride[1], stride[2]], pad, dataFormat, [dilations[0], dilations[1]])];
         }
         case 'avgPool': {
-            var stride = utils_1.getParamValue('strides', node, tensorMap);
-            var pad = utils_1.getParamValue('pad', node, tensorMap);
-            var kernelSize = utils_1.getParamValue('kernelSize', node, tensorMap);
-            return [tfc.avgPool(utils_1.getParamValue('x', node, tensorMap), [kernelSize[1], kernelSize[2]], [stride[1], stride[2]], pad)];
+            var stride = utils_1.getParamValue('strides', node, tensorMap, context);
+            var pad = utils_1.getParamValue('pad', node, tensorMap, context);
+            var kernelSize = utils_1.getParamValue('kernelSize', node, tensorMap, context);
+            return [tfc.avgPool(utils_1.getParamValue('x', node, tensorMap, context), [kernelSize[1], kernelSize[2]], [stride[1], stride[2]], pad)];
         }
         case 'maxPool': {
-            var stride = utils_1.getParamValue('strides', node, tensorMap);
-            var pad = utils_1.getParamValue('pad', node, tensorMap);
-            var kernelSize = utils_1.getParamValue('kernelSize', node, tensorMap);
-            return [tfc.maxPool(utils_1.getParamValue('x', node, tensorMap), [kernelSize[1], kernelSize[2]], [stride[1], stride[2]], pad)];
+            var stride = utils_1.getParamValue('strides', node, tensorMap, context);
+            var pad = utils_1.getParamValue('pad', node, tensorMap, context);
+            var kernelSize = utils_1.getParamValue('kernelSize', node, tensorMap, context);
+            return [tfc.maxPool(utils_1.getParamValue('x', node, tensorMap, context), [kernelSize[1], kernelSize[2]], [stride[1], stride[2]], pad)];
         }
         default:
             throw TypeError("Node type " + node.op + " is not implemented");
@@ -26519,58 +26858,58 @@ exports.executeOp = function (node, tensorMap) {
 };
 exports.CATEGORY = 'convolution';
 
-},{"./utils":140,"@tensorflow/tfjs-core":16}],131:[function(require,module,exports){
+},{"./utils":142,"@tensorflow/tfjs-core":16}],133:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
 var utils_1 = require("./utils");
-exports.executeOp = function (node, tensorMap) {
+exports.executeOp = function (node, tensorMap, context) {
     switch (node.op) {
         case 'fill': {
-            var shape = utils_1.getParamValue('shape', node, tensorMap);
-            var value = utils_1.getParamValue('value', node, tensorMap);
+            var shape = utils_1.getParamValue('shape', node, tensorMap, context);
+            var value = utils_1.getParamValue('value', node, tensorMap, context);
             return [tfc.fill(shape, value)];
         }
         case 'linspace': {
-            var start = utils_1.getParamValue('start', node, tensorMap);
-            var stop_1 = utils_1.getParamValue('stop', node, tensorMap);
-            var num = utils_1.getParamValue('num', node, tensorMap);
+            var start = utils_1.getParamValue('start', node, tensorMap, context);
+            var stop_1 = utils_1.getParamValue('stop', node, tensorMap, context);
+            var num = utils_1.getParamValue('num', node, tensorMap, context);
             return [tfc.linspace(start, stop_1, num)];
         }
         case 'oneHot': {
-            var indices = utils_1.getParamValue('indices', node, tensorMap);
-            var depth = utils_1.getParamValue('depth', node, tensorMap);
-            var onValue = utils_1.getParamValue('onValue', node, tensorMap);
-            var offValue = utils_1.getParamValue('offValue', node, tensorMap);
+            var indices = utils_1.getParamValue('indices', node, tensorMap, context);
+            var depth = utils_1.getParamValue('depth', node, tensorMap, context);
+            var onValue = utils_1.getParamValue('onValue', node, tensorMap, context);
+            var offValue = utils_1.getParamValue('offValue', node, tensorMap, context);
             return [tfc.oneHot(indices, depth, onValue, offValue)];
         }
         case 'ones': {
-            return [tfc.ones(utils_1.getParamValue('shape', node, tensorMap), utils_1.getParamValue('dtype', node, tensorMap))];
+            return [tfc.ones(utils_1.getParamValue('shape', node, tensorMap, context), utils_1.getParamValue('dtype', node, tensorMap, context))];
         }
         case 'onesLike': {
-            return [tfc.onesLike(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.onesLike(utils_1.getParamValue('x', node, tensorMap, context))];
         }
         case 'randomUniform': {
-            return [tfc.randomUniform(utils_1.getParamValue('shape', node, tensorMap), utils_1.getParamValue('minval', node, tensorMap), utils_1.getParamValue('maxval', node, tensorMap), utils_1.getParamValue('dtype', node, tensorMap))];
+            return [tfc.randomUniform(utils_1.getParamValue('shape', node, tensorMap, context), utils_1.getParamValue('minval', node, tensorMap, context), utils_1.getParamValue('maxval', node, tensorMap, context), utils_1.getParamValue('dtype', node, tensorMap, context))];
         }
         case 'range': {
-            var start = utils_1.getParamValue('start', node, tensorMap);
-            var stop_2 = utils_1.getParamValue('stop', node, tensorMap);
-            var step = utils_1.getParamValue('step', node, tensorMap);
-            return [tfc.range(start, stop_2, step, utils_1.getParamValue('dtype', node, tensorMap))];
+            var start = utils_1.getParamValue('start', node, tensorMap, context);
+            var stop_2 = utils_1.getParamValue('stop', node, tensorMap, context);
+            var step = utils_1.getParamValue('step', node, tensorMap, context);
+            return [tfc.range(start, stop_2, step, utils_1.getParamValue('dtype', node, tensorMap, context))];
         }
         case 'truncatedNormal': {
-            var shape = utils_1.getParamValue('shape', node, tensorMap);
-            var mean = utils_1.getParamValue('mean', node, tensorMap);
-            var stdDev = utils_1.getParamValue('stdDev', node, tensorMap);
-            var seed = utils_1.getParamValue('seed', node, tensorMap);
-            return [tfc.truncatedNormal(shape, mean, stdDev, utils_1.getParamValue('dtype', node, tensorMap), seed)];
+            var shape = utils_1.getParamValue('shape', node, tensorMap, context);
+            var mean = utils_1.getParamValue('mean', node, tensorMap, context);
+            var stdDev = utils_1.getParamValue('stdDev', node, tensorMap, context);
+            var seed = utils_1.getParamValue('seed', node, tensorMap, context);
+            return [tfc.truncatedNormal(shape, mean, stdDev, utils_1.getParamValue('dtype', node, tensorMap, context), seed)];
         }
         case 'zeros': {
-            return [tfc.zeros(utils_1.getParamValue('shape', node, tensorMap), utils_1.getParamValue('dtype', node, tensorMap))];
+            return [tfc.zeros(utils_1.getParamValue('shape', node, tensorMap, context), utils_1.getParamValue('dtype', node, tensorMap, context))];
         }
         case 'zerosLike': {
-            return [tfc.zerosLike(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.zerosLike(utils_1.getParamValue('x', node, tensorMap, context))];
         }
         default:
             throw TypeError("Node type " + node.op + " is not implemented");
@@ -26578,30 +26917,30 @@ exports.executeOp = function (node, tensorMap) {
 };
 exports.CATEGORY = 'creation';
 
-},{"./utils":140,"@tensorflow/tfjs-core":16}],132:[function(require,module,exports){
+},{"./utils":142,"@tensorflow/tfjs-core":16}],134:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
 var utils_1 = require("./utils");
-exports.executeOp = function (node, tensorMap) {
+exports.executeOp = function (node, tensorMap, context) {
     switch (node.op) {
         case 'const': {
             return tensorMap[node.name];
         }
         case 'placeholder':
-            var def = utils_1.getParamValue('default', node, tensorMap);
-            return [utils_1.getTensor(node.name, tensorMap) || def];
+            var def = utils_1.getParamValue('default', node, tensorMap, context);
+            return [utils_1.getTensor(node.name, tensorMap, context) || def];
         case 'identity':
-            return [utils_1.getParamValue('x', node, tensorMap)];
+            return [utils_1.getParamValue('x', node, tensorMap, context)];
         case 'shape':
-            return [tfc.tensor1d(utils_1.getParamValue('x', node, tensorMap).shape, 'int32')];
+            return [tfc.tensor1d(utils_1.getParamValue('x', node, tensorMap, context).shape, 'int32')];
         case 'noop':
             return [];
         case 'print':
-            var input = utils_1.getParamValue('x', node, tensorMap);
-            var data = utils_1.getParamValue('data', node, tensorMap);
-            var message = utils_1.getParamValue('message', node, tensorMap);
-            var summarize = utils_1.getParamValue('summarize', node, tensorMap);
+            var input = utils_1.getParamValue('x', node, tensorMap, context);
+            var data = utils_1.getParamValue('data', node, tensorMap, context);
+            var message = utils_1.getParamValue('message', node, tensorMap, context);
+            var summarize = utils_1.getParamValue('summarize', node, tensorMap, context);
             console.warn('The graph has a tf.print() operation,' +
                 'usually used for debugging, which slows down performance.');
             console.log(message);
@@ -26615,17 +26954,17 @@ exports.executeOp = function (node, tensorMap) {
 };
 exports.CATEGORY = 'graph';
 
-},{"./utils":140,"@tensorflow/tfjs-core":16}],133:[function(require,module,exports){
+},{"./utils":142,"@tensorflow/tfjs-core":16}],135:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
 var utils_1 = require("./utils");
-exports.executeOp = function (node, tensorMap) {
+exports.executeOp = function (node, tensorMap, context) {
     switch (node.op) {
         case 'resizeBilinear': {
-            var images = utils_1.getParamValue('image', node, tensorMap);
-            var size = utils_1.getParamValue('size', node, tensorMap);
-            var alignCorners = utils_1.getParamValue('alignCorners', node, tensorMap);
+            var images = utils_1.getParamValue('images', node, tensorMap, context);
+            var size = utils_1.getParamValue('size', node, tensorMap, context);
+            var alignCorners = utils_1.getParamValue('alignCorners', node, tensorMap, context);
             return [tfc.image.resizeBilinear(images, [size[0], size[1]], alignCorners)];
         }
         default:
@@ -26634,39 +26973,39 @@ exports.executeOp = function (node, tensorMap) {
 };
 exports.CATEGORY = 'image';
 
-},{"./utils":140,"@tensorflow/tfjs-core":16}],134:[function(require,module,exports){
+},{"./utils":142,"@tensorflow/tfjs-core":16}],136:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
 var utils_1 = require("./utils");
-exports.executeOp = function (node, tensorMap) {
+exports.executeOp = function (node, tensorMap, context) {
     switch (node.op) {
         case 'equal': {
-            return [tfc.equal(utils_1.getParamValue('a', node, tensorMap), utils_1.getParamValue('b', node, tensorMap))];
+            return [tfc.equal(utils_1.getParamValue('a', node, tensorMap, context), utils_1.getParamValue('b', node, tensorMap, context))];
         }
         case 'greater': {
-            return [tfc.greater(utils_1.getParamValue('a', node, tensorMap), utils_1.getParamValue('b', node, tensorMap))];
+            return [tfc.greater(utils_1.getParamValue('a', node, tensorMap, context), utils_1.getParamValue('b', node, tensorMap, context))];
         }
         case 'greaterEqual': {
-            return [tfc.greaterEqual(utils_1.getParamValue('a', node, tensorMap), utils_1.getParamValue('b', node, tensorMap))];
+            return [tfc.greaterEqual(utils_1.getParamValue('a', node, tensorMap, context), utils_1.getParamValue('b', node, tensorMap, context))];
         }
         case 'less': {
-            return [tfc.less(utils_1.getParamValue('a', node, tensorMap), utils_1.getParamValue('b', node, tensorMap))];
+            return [tfc.less(utils_1.getParamValue('a', node, tensorMap, context), utils_1.getParamValue('b', node, tensorMap, context))];
         }
         case 'lessEqual': {
-            return [tfc.lessEqual(utils_1.getParamValue('a', node, tensorMap), utils_1.getParamValue('b', node, tensorMap))];
+            return [tfc.lessEqual(utils_1.getParamValue('a', node, tensorMap, context), utils_1.getParamValue('b', node, tensorMap, context))];
         }
         case 'logicalAnd': {
-            return [tfc.logicalAnd(utils_1.getParamValue('a', node, tensorMap), utils_1.getParamValue('b', node, tensorMap))];
+            return [tfc.logicalAnd(utils_1.getParamValue('a', node, tensorMap, context), utils_1.getParamValue('b', node, tensorMap, context))];
         }
         case 'logicalNot': {
-            return [tfc.logicalNot(utils_1.getParamValue('a', node, tensorMap))];
+            return [tfc.logicalNot(utils_1.getParamValue('a', node, tensorMap, context))];
         }
         case 'logicalOr': {
-            return [tfc.logicalOr(utils_1.getParamValue('a', node, tensorMap), utils_1.getParamValue('b', node, tensorMap))];
+            return [tfc.logicalOr(utils_1.getParamValue('a', node, tensorMap, context), utils_1.getParamValue('b', node, tensorMap, context))];
         }
         case 'where': {
-            return [tfc.where(utils_1.getParamValue('condition', node, tensorMap), utils_1.getParamValue('a', node, tensorMap), utils_1.getParamValue('b', node, tensorMap))];
+            return [tfc.where(utils_1.getParamValue('condition', node, tensorMap, context), utils_1.getParamValue('a', node, tensorMap, context), utils_1.getParamValue('b', node, tensorMap, context))];
         }
         default:
             throw TypeError("Node type " + node.op + " is not implemented");
@@ -26674,38 +27013,38 @@ exports.executeOp = function (node, tensorMap) {
 };
 exports.CATEGORY = 'logical';
 
-},{"./utils":140,"@tensorflow/tfjs-core":16}],135:[function(require,module,exports){
+},{"./utils":142,"@tensorflow/tfjs-core":16}],137:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
 var utils_1 = require("./utils");
-exports.executeOp = function (node, tensorMap) {
+exports.executeOp = function (node, tensorMap, context) {
     switch (node.op) {
         case 'matMul':
-            return [tfc.matMul(utils_1.getParamValue('a', node, tensorMap), utils_1.getParamValue('b', node, tensorMap), utils_1.getParamValue('transposeA', node, tensorMap), utils_1.getParamValue('transposeB', node, tensorMap))];
+            return [tfc.matMul(utils_1.getParamValue('a', node, tensorMap, context), utils_1.getParamValue('b', node, tensorMap, context), utils_1.getParamValue('transposeA', node, tensorMap, context), utils_1.getParamValue('transposeB', node, tensorMap, context))];
         case 'transpose':
-            return [tfc.transpose(utils_1.getParamValue('x', node, tensorMap), utils_1.getParamValue('perm', node, tensorMap))];
+            return [tfc.transpose(utils_1.getParamValue('x', node, tensorMap, context), utils_1.getParamValue('perm', node, tensorMap, context))];
         default:
             throw TypeError("Node type " + node.op + " is not implemented");
     }
 };
 exports.CATEGORY = 'matrices';
 
-},{"./utils":140,"@tensorflow/tfjs-core":16}],136:[function(require,module,exports){
+},{"./utils":142,"@tensorflow/tfjs-core":16}],138:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
 var utils_1 = require("./utils");
-exports.executeOp = function (node, tensorMap) {
+exports.executeOp = function (node, tensorMap, context) {
     switch (node.op) {
         case 'batchNormalization': {
-            return [tfc.batchNormalization(utils_1.getParamValue('x', node, tensorMap), utils_1.getParamValue('mean', node, tensorMap), utils_1.getParamValue('variance', node, tensorMap), utils_1.getParamValue('epislon', node, tensorMap), utils_1.getParamValue('scale', node, tensorMap), utils_1.getParamValue('offset', node, tensorMap))];
+            return [tfc.batchNormalization(utils_1.getParamValue('x', node, tensorMap, context), utils_1.getParamValue('mean', node, tensorMap, context), utils_1.getParamValue('variance', node, tensorMap, context), utils_1.getParamValue('epislon', node, tensorMap, context), utils_1.getParamValue('scale', node, tensorMap, context), utils_1.getParamValue('offset', node, tensorMap, context))];
         }
         case 'localResponseNormalization': {
-            return [tfc.localResponseNormalization(utils_1.getParamValue('x', node, tensorMap), utils_1.getParamValue('radius', node, tensorMap), utils_1.getParamValue('bias', node, tensorMap), utils_1.getParamValue('alpha', node, tensorMap), utils_1.getParamValue('beta', node, tensorMap))];
+            return [tfc.localResponseNormalization(utils_1.getParamValue('x', node, tensorMap, context), utils_1.getParamValue('radius', node, tensorMap, context), utils_1.getParamValue('bias', node, tensorMap, context), utils_1.getParamValue('alpha', node, tensorMap, context), utils_1.getParamValue('beta', node, tensorMap, context))];
         }
         case 'softmax': {
-            return [tfc.softmax(utils_1.getParamValue('x', node, tensorMap))];
+            return [tfc.softmax(utils_1.getParamValue('x', node, tensorMap, context))];
         }
         default:
             throw TypeError("Node type " + node.op + " is not implemented");
@@ -26713,40 +27052,40 @@ exports.executeOp = function (node, tensorMap) {
 };
 exports.CATEGORY = 'normalization';
 
-},{"./utils":140,"@tensorflow/tfjs-core":16}],137:[function(require,module,exports){
+},{"./utils":142,"@tensorflow/tfjs-core":16}],139:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
 var utils_1 = require("./utils");
-exports.executeOp = function (node, tensorMap) {
+exports.executeOp = function (node, tensorMap, context) {
     switch (node.op) {
         case 'max': {
-            var axis = utils_1.getParamValue('axis', node, tensorMap);
-            var keepDims = utils_1.getParamValue('keepDims', node, tensorMap);
-            return [tfc.max(utils_1.getParamValue('x', node, tensorMap), axis, keepDims)];
+            var axis = utils_1.getParamValue('axis', node, tensorMap, context);
+            var keepDims = utils_1.getParamValue('keepDims', node, tensorMap, context);
+            return [tfc.max(utils_1.getParamValue('x', node, tensorMap, context), axis, keepDims)];
         }
         case 'mean': {
-            var axis = utils_1.getParamValue('axis', node, tensorMap);
-            var keepDims = utils_1.getParamValue('keepDims', node, tensorMap);
-            return [tfc.mean(utils_1.getParamValue('x', node, tensorMap), axis, keepDims)];
+            var axis = utils_1.getParamValue('axis', node, tensorMap, context);
+            var keepDims = utils_1.getParamValue('keepDims', node, tensorMap, context);
+            return [tfc.mean(utils_1.getParamValue('x', node, tensorMap, context), axis, keepDims)];
         }
         case 'min': {
-            var axis = utils_1.getParamValue('axis', node, tensorMap);
-            var keepDims = utils_1.getParamValue('keepDims', node, tensorMap);
-            return [tfc.min(utils_1.getParamValue('x', node, tensorMap), axis, keepDims)];
+            var axis = utils_1.getParamValue('axis', node, tensorMap, context);
+            var keepDims = utils_1.getParamValue('keepDims', node, tensorMap, context);
+            return [tfc.min(utils_1.getParamValue('x', node, tensorMap, context), axis, keepDims)];
         }
         case 'sum': {
-            var axis = utils_1.getParamValue('axis', node, tensorMap);
-            var keepDims = utils_1.getParamValue('keepDims', node, tensorMap);
-            return [tfc.sum(utils_1.getParamValue('x', node, tensorMap), axis, keepDims)];
+            var axis = utils_1.getParamValue('axis', node, tensorMap, context);
+            var keepDims = utils_1.getParamValue('keepDims', node, tensorMap, context);
+            return [tfc.sum(utils_1.getParamValue('x', node, tensorMap, context), axis, keepDims)];
         }
         case 'argMax': {
-            var axis = utils_1.getParamValue('axis', node, tensorMap);
-            return [tfc.argMax(utils_1.getParamValue('x', node, tensorMap), axis)];
+            var axis = utils_1.getParamValue('axis', node, tensorMap, context);
+            return [tfc.argMax(utils_1.getParamValue('x', node, tensorMap, context), axis)];
         }
         case 'argMin': {
-            var axis = utils_1.getParamValue('axis', node, tensorMap);
-            return [tfc.argMin(utils_1.getParamValue('x', node, tensorMap), axis)];
+            var axis = utils_1.getParamValue('axis', node, tensorMap, context);
+            return [tfc.argMin(utils_1.getParamValue('x', node, tensorMap, context), axis)];
         }
         default:
             throw TypeError("Node type " + node.op + " is not implemented");
@@ -26754,47 +27093,47 @@ exports.executeOp = function (node, tensorMap) {
 };
 exports.CATEGORY = 'reduction';
 
-},{"./utils":140,"@tensorflow/tfjs-core":16}],138:[function(require,module,exports){
+},{"./utils":142,"@tensorflow/tfjs-core":16}],140:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
 var utils_1 = require("./utils");
-exports.executeOp = function (node, tensorMap) {
+exports.executeOp = function (node, tensorMap, context) {
     switch (node.op) {
         case 'concat': {
-            var axis = utils_1.getParamValue('axis', node, tensorMap);
-            var inputs = utils_1.getParamValue('tensors', node, tensorMap);
+            var axis = utils_1.getParamValue('axis', node, tensorMap, context);
+            var inputs = utils_1.getParamValue('tensors', node, tensorMap, context);
             return [tfc.concat(inputs, axis)];
         }
         case 'gather': {
-            var axis = utils_1.getParamValue('axis', node, tensorMap);
-            var input = utils_1.getParamValue('x', node, tensorMap);
-            var indices = utils_1.getParamValue('indices', node, tensorMap);
+            var axis = utils_1.getParamValue('axis', node, tensorMap, context);
+            var input = utils_1.getParamValue('x', node, tensorMap, context);
+            var indices = utils_1.getParamValue('indices', node, tensorMap, context);
             return [tfc.gather(input, indices, axis)];
         }
         case 'reverse': {
-            var axis = utils_1.getParamValue('axis', node, tensorMap);
-            var input = utils_1.getParamValue('x', node, tensorMap);
+            var axis = utils_1.getParamValue('axis', node, tensorMap, context);
+            var input = utils_1.getParamValue('x', node, tensorMap, context);
             return [tfc.reverse(input, axis)];
         }
         case 'slice': {
-            var begin = utils_1.getParamValue('begin', node, tensorMap);
-            var size = utils_1.getParamValue('size', node, tensorMap);
-            return [tfc.slice(utils_1.getParamValue('x', node, tensorMap), begin, size)];
+            var begin = utils_1.getParamValue('begin', node, tensorMap, context);
+            var size = utils_1.getParamValue('size', node, tensorMap, context);
+            return [tfc.slice(utils_1.getParamValue('x', node, tensorMap, context), begin, size)];
         }
         case 'split': {
-            var axis = utils_1.getParamValue('axis', node, tensorMap);
-            var input = utils_1.getParamValue('x', node, tensorMap);
-            var numOrSizeSplits = utils_1.getParamValue('numOrSizeSplits', node, tensorMap);
+            var axis = utils_1.getParamValue('axis', node, tensorMap, context);
+            var input = utils_1.getParamValue('x', node, tensorMap, context);
+            var numOrSizeSplits = utils_1.getParamValue('numOrSizeSplits', node, tensorMap, context);
             return tfc.split(input, numOrSizeSplits, axis);
         }
         case 'stack': {
-            var axis = utils_1.getParamValue('axis', node, tensorMap);
-            return [tfc.stack(utils_1.getParamValue('tensors', node, tensorMap), axis)];
+            var axis = utils_1.getParamValue('axis', node, tensorMap, context);
+            return [tfc.stack(utils_1.getParamValue('tensors', node, tensorMap, context), axis)];
         }
         case 'tile': {
-            var reps = utils_1.getParamValue('reps', node, tensorMap);
-            return [tfc.tile(utils_1.getParamValue('x', node, tensorMap), reps)];
+            var reps = utils_1.getParamValue('reps', node, tensorMap, context);
+            return [tfc.tile(utils_1.getParamValue('x', node, tensorMap, context), reps)];
         }
         default:
             throw TypeError("Node type " + node.op + " is not implemented");
@@ -26802,29 +27141,29 @@ exports.executeOp = function (node, tensorMap) {
 };
 exports.CATEGORY = 'slice_join';
 
-},{"./utils":140,"@tensorflow/tfjs-core":16}],139:[function(require,module,exports){
+},{"./utils":142,"@tensorflow/tfjs-core":16}],141:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
 var utils_1 = require("./utils");
-exports.executeOp = function (node, tensorMap) {
+exports.executeOp = function (node, tensorMap, context) {
     switch (node.op) {
         case 'cast': {
-            return [tfc.cast(utils_1.getParamValue('x', node, tensorMap), utils_1.getParamValue('dtype', node, tensorMap))];
+            return [tfc.cast(utils_1.getParamValue('x', node, tensorMap, context), utils_1.getParamValue('dtype', node, tensorMap, context))];
         }
         case 'expandDims': {
             var axis = node.params['axis'].value;
-            return [tfc.expandDims(utils_1.getParamValue('x', node, tensorMap), axis)];
+            return [tfc.expandDims(utils_1.getParamValue('x', node, tensorMap, context), axis)];
         }
         case 'squeeze': {
             var axis = node.params['axis'].value;
-            return [tfc.squeeze(utils_1.getParamValue('x', node, tensorMap), axis)];
+            return [tfc.squeeze(utils_1.getParamValue('x', node, tensorMap, context), axis)];
         }
         case 'reshape': {
-            return [tfc.reshape(utils_1.getParamValue('x', node, tensorMap), utils_1.getParamValue('shape', node, tensorMap))];
+            return [tfc.reshape(utils_1.getParamValue('x', node, tensorMap, context), utils_1.getParamValue('shape', node, tensorMap, context))];
         }
         case 'pad': {
-            return [tfc.pad(utils_1.getParamValue('x', node, tensorMap), utils_1.getParamValue('padding', node, tensorMap), utils_1.getParamValue('constantValue', node, tensorMap))];
+            return [tfc.pad(utils_1.getParamValue('x', node, tensorMap, context), utils_1.split(utils_1.getParamValue('padding', node, tensorMap, context), 2), utils_1.getParamValue('constantValue', node, tensorMap, context))];
         }
         default:
             throw TypeError("Node type " + node.op + " is not implemented");
@@ -26832,43 +27171,83 @@ exports.executeOp = function (node, tensorMap) {
 };
 exports.CATEGORY = 'transformation';
 
-},{"./utils":140,"@tensorflow/tfjs-core":16}],140:[function(require,module,exports){
+},{"./utils":142,"@tensorflow/tfjs-core":16}],142:[function(require,module,exports){
 "use strict";
+var __read = (this && this.__read) || function (o, n) {
+    var m = typeof Symbol === "function" && o[Symbol.iterator];
+    if (!m) return o;
+    var i = m.call(o), r, ar = [], e;
+    try {
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
+    }
+    catch (error) { e = { error: error }; }
+    finally {
+        try {
+            if (r && !r.done && (m = i["return"])) m.call(i);
+        }
+        finally { if (e) throw e.error; }
+    }
+    return ar;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-function getParamValue(paramName, node, tensorMap) {
+function getParamValue(paramName, node, tensorMap, context) {
     var param = node.params[paramName];
     if (param && param.inputIndex !== undefined) {
         if (param.type === 'tensor') {
-            return getTensor(node.inputNames[param.inputIndex], tensorMap);
+            return getTensor(node.inputNames[param.inputIndex], tensorMap, context);
         }
         if (param.type === 'tensors') {
             var inputs = param.inputIndex === 0 ?
                 node.inputNames.slice(param.inputIndex, -param.inputParamLength) :
                 node.inputNames.splice(param.inputIndex);
-            return inputs.map(function (name) { return getTensor(name, tensorMap); });
+            return inputs.map(function (name) { return getTensor(name, tensorMap, context); });
         }
-        var data = Array.prototype.slice.call(getTensor(node.inputNames.slice(param.inputIndex)[0], tensorMap)
+        var data = Array.prototype.slice.call(getTensor(node.inputNames.slice(param.inputIndex)[0], tensorMap, context)
             .dataSync());
         return param.type === 'number' ? data[0] : data;
     }
     return param && param.value;
 }
 exports.getParamValue = getParamValue;
-function getTensor(name, tensorMap) {
-    var index = name.lastIndexOf(':');
-    if (index === -1) {
-        return tensorMap[name] ? tensorMap[name][0] : undefined;
-    }
-    else {
-        var nodeName = name.substring(0, index);
-        return tensorMap[nodeName] ?
-            tensorMap[nodeName][Number(name.substring(index + 1))] :
-            undefined;
-    }
+function getTensor(name, tensorsMap, context) {
+    var _a = __read(parseNodeName(name), 2), nodeName = _a[0], index = _a[1];
+    var contextId = context.currentContextIds.find(function (contextId) {
+        return !!tensorsMap[getNodeNameWithContextId(nodeName, contextId)];
+    });
+    return contextId !== undefined ?
+        tensorsMap[getNodeNameWithContextId(nodeName, contextId)][index] :
+        undefined;
 }
 exports.getTensor = getTensor;
+function getNodeNameAndIndex(inputName, context) {
+    var _a = __read(parseNodeName(inputName), 2), nodeName = _a[0], index = _a[1];
+    return [
+        getNodeNameWithContextId(nodeName, context && context.currentContextId),
+        index
+    ];
+}
+exports.getNodeNameAndIndex = getNodeNameAndIndex;
+function getNodeNameWithContextId(name, contextId) {
+    return !!contextId ? name + "-" + contextId : name;
+}
+function parseNodeName(name) {
+    var index = name.lastIndexOf(':');
+    if (index === -1)
+        return [name, 0];
+    var nodeName = name.substring(0, index);
+    return [nodeName, Number(name.substring(index + 1))];
+}
+exports.parseNodeName = parseNodeName;
+function split(arr, size) {
+    var res = [];
+    for (var i = 0; i < arr.length; i += size) {
+        res.push(arr.slice(i, i + size));
+    }
+    return res;
+}
+exports.split = split;
 
-},{}],141:[function(require,module,exports){
+},{}],143:[function(require,module,exports){
 "use strict";
 function __export(m) {
     for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
@@ -26877,7 +27256,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 __export(require("./operation_mapper"));
 __export(require("./operation_executor"));
 
-},{"./operation_executor":154,"./operation_mapper":155}],142:[function(require,module,exports){
+},{"./operation_executor":156,"./operation_mapper":157}],144:[function(require,module,exports){
 module.exports=[
   {
     "tfOpName": "Add",
@@ -27076,7 +27455,7 @@ module.exports=[
   }
 ]
 
-},{}],143:[function(require,module,exports){
+},{}],145:[function(require,module,exports){
 module.exports=[
   {
     "tfOpName": "Abs",
@@ -27526,7 +27905,117 @@ module.exports=[
   }
 ]
 
-},{}],144:[function(require,module,exports){
+},{}],146:[function(require,module,exports){
+module.exports=[
+  {
+    "tfOpName": "LoopCond",
+    "dlOpName": "loopCond",
+    "category": "control",
+    "params": [
+      {
+        "tfInputIndex": 0,
+        "dlParamName": "pred",
+        "type": "tensor"
+      }
+    ]
+  },
+  {
+    "tfOpName": "Switch",
+    "dlOpName": "switch",
+    "category": "control",
+    "params": [
+      {
+        "tfInputIndex": 0,
+        "dlParamName": "data",
+        "type": "tensor"
+      },
+      {
+        "tfInputIndex": 1,
+        "dlParamName": "pred",
+        "type": "tensor"
+      }
+    ]
+  },
+  {
+    "tfOpName": "Merge",
+    "dlOpName": "merge",
+    "category": "control",
+    "params": [
+      {
+        "tfInputIndex": 0,
+        "tfInputParamLength": 0,
+        "dlParamName": "tensors",
+        "type": "tensors"
+      }
+    ]
+  },
+  {
+    "tfOpName": "Enter",
+    "dlOpName": "enter",
+    "category": "control",
+    "params": [
+      {
+        "tfInputIndex": 0,
+        "dlParamName": "tensor",
+        "type": "tensor"
+      },
+      {
+        "tfParamName": "T",
+        "dlParamName": "dtype",
+        "type": "dtype",
+        "notSupported": true
+      },
+      {
+        "tfParamName": "frame_name",
+        "dlParamName": "frameName",
+        "type": "string"
+      },
+      {
+        "tfParamName": "is_constant",
+        "dlParamName": "isConstant",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "tfOpName": "Exit",
+    "dlOpName": "exit",
+    "category": "control",
+    "params": [
+      {
+        "tfInputIndex": 0,
+        "dlParamName": "tensor",
+        "type": "tensor"
+      },
+      {
+        "tfParamName": "T",
+        "dlParamName": "dtype",
+        "type": "dtype",
+        "notSupported": true
+      }
+    ]
+  },
+  {
+    "tfOpName": "NextIteration",
+    "dlOpName": "nextIteration",
+    "category": "control",
+    "params": [
+      {
+        "tfInputIndex": 0,
+        "dlParamName": "tensor",
+        "type": "tensor"
+      },
+      {
+        "tfParamName": "T",
+        "dlParamName": "dtype",
+        "type": "dtype",
+        "notSupported": true
+      }
+    ]
+  }
+]
+
+},{}],147:[function(require,module,exports){
 module.exports=[
   {
     "tfOpName": "AvgPool",
@@ -27854,7 +28343,7 @@ module.exports=[
   }
 ]
 
-},{}],145:[function(require,module,exports){
+},{}],148:[function(require,module,exports){
 module.exports=[
   {
     "tfOpName": "Fill",
@@ -28141,7 +28630,7 @@ module.exports=[
   }
 ]
 
-},{}],146:[function(require,module,exports){
+},{}],149:[function(require,module,exports){
 module.exports=[
   {
     "tfOpName": "PlaceholderWithDefault",
@@ -28232,39 +28721,7 @@ module.exports=[
   }
 ]
 
-},{}],147:[function(require,module,exports){
-module.exports=[
-  {
-    "tfOpName": "ResizeBilinear",
-    "dlOpName": "resizeBilinear",
-    "category": "image",
-    "params": [
-      {
-        "tfInputIndex": 0,
-        "dlParamName": "image",
-        "type": "tensor"
-      },
-      {
-        "tfInputIndex": 1,
-        "dlParamName": "size",
-        "type": "number[]"
-      },
-      {
-        "tfParamName": "align_corners",
-        "dlParamName": "alignCorners",
-        "type": "bool"
-      },
-      {
-        "tfParamName": "T",
-        "dlParamName": "dtype",
-        "type": "dtype",
-        "notSupported": true
-      }
-    ]
-  }
-]
-
-},{}],148:[function(require,module,exports){
+},{}],150:[function(require,module,exports){
 module.exports=[
   {
     "tfOpName": "Equal",
@@ -28475,7 +28932,7 @@ module.exports=[
   }
 ]
 
-},{}],149:[function(require,module,exports){
+},{}],151:[function(require,module,exports){
 module.exports=[
   {
     "tfOpName": "MatMul",
@@ -28537,7 +28994,7 @@ module.exports=[
   }
 ]
 
-},{}],150:[function(require,module,exports){
+},{}],152:[function(require,module,exports){
 module.exports=[
   {
     "tfOpName": "FusedBatchNorm",
@@ -28676,7 +29133,7 @@ module.exports=[
   }
 ]
 
-},{}],151:[function(require,module,exports){
+},{}],153:[function(require,module,exports){
 module.exports=[
   {
     "tfOpName": "Max",
@@ -28802,7 +29259,7 @@ module.exports=[
   }
 ]
 
-},{}],152:[function(require,module,exports){
+},{}],154:[function(require,module,exports){
 module.exports=[
   {
     "tfOpName": "ConcatV2",
@@ -29004,7 +29461,7 @@ module.exports=[
   }
 ]
 
-},{}],153:[function(require,module,exports){
+},{}],155:[function(require,module,exports){
 module.exports=[
   {
     "tfOpName": "Cast",
@@ -29125,11 +29582,12 @@ module.exports=[
   }
 ]
 
-},{}],154:[function(require,module,exports){
+},{}],156:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var arithmetic = require("./executors/arithmetic_executor");
 var basicMath = require("./executors/basic_math_executor");
+var control = require("./executors/control_executor");
 var convolution = require("./executors/convolution_executor");
 var creation = require("./executors/creation_executor");
 var graph = require("./executors/graph_executor");
@@ -29140,39 +29598,41 @@ var normalization = require("./executors/normalization_executor");
 var reduction = require("./executors/reduction_executor");
 var sliceJoin = require("./executors/slice_join_executor");
 var transformation = require("./executors/transformation_executor");
-function executeOp(node, tensorMap) {
+function executeOp(node, tensorMap, context) {
     switch (node.category) {
         case 'arithmetic':
-            return arithmetic.executeOp(node, tensorMap);
+            return arithmetic.executeOp(node, tensorMap, context);
         case 'basic_math':
-            return basicMath.executeOp(node, tensorMap);
+            return basicMath.executeOp(node, tensorMap, context);
+        case 'control':
+            return control.executeOp(node, tensorMap, context);
         case 'convolution':
-            return convolution.executeOp(node, tensorMap);
+            return convolution.executeOp(node, tensorMap, context);
         case 'creation':
-            return creation.executeOp(node, tensorMap);
+            return creation.executeOp(node, tensorMap, context);
         case 'image':
-            return image.executeOp(node, tensorMap);
+            return image.executeOp(node, tensorMap, context);
         case 'graph':
-            return graph.executeOp(node, tensorMap);
+            return graph.executeOp(node, tensorMap, context);
         case 'logical':
-            return logical.executeOp(node, tensorMap);
+            return logical.executeOp(node, tensorMap, context);
         case 'matrices':
-            return matrices.executeOp(node, tensorMap);
+            return matrices.executeOp(node, tensorMap, context);
         case 'normalization':
-            return normalization.executeOp(node, tensorMap);
+            return normalization.executeOp(node, tensorMap, context);
         case 'reduction':
-            return reduction.executeOp(node, tensorMap);
+            return reduction.executeOp(node, tensorMap, context);
         case 'slice_join':
-            return sliceJoin.executeOp(node, tensorMap);
+            return sliceJoin.executeOp(node, tensorMap, context);
         case 'transformation':
-            return transformation.executeOp(node, tensorMap);
+            return transformation.executeOp(node, tensorMap, context);
         default:
             throw TypeError("Node type " + node.op + " is not implemented");
     }
 }
 exports.executeOp = executeOp;
 
-},{"./executors/arithmetic_executor":128,"./executors/basic_math_executor":129,"./executors/convolution_executor":130,"./executors/creation_executor":131,"./executors/graph_executor":132,"./executors/image_executor":133,"./executors/logical_executor":134,"./executors/matrices_executor":135,"./executors/normalization_executor":136,"./executors/reduction_executor":137,"./executors/slice_join_executor":138,"./executors/transformation_executor":139}],155:[function(require,module,exports){
+},{"./executors/arithmetic_executor":129,"./executors/basic_math_executor":130,"./executors/control_executor":131,"./executors/convolution_executor":132,"./executors/creation_executor":133,"./executors/graph_executor":134,"./executors/image_executor":135,"./executors/logical_executor":136,"./executors/matrices_executor":137,"./executors/normalization_executor":138,"./executors/reduction_executor":139,"./executors/slice_join_executor":140,"./executors/transformation_executor":141}],157:[function(require,module,exports){
 "use strict";
 var __read = (this && this.__read) || function (o, n) {
     var m = typeof Symbol === "function" && o[Symbol.iterator];
@@ -29196,8 +29656,10 @@ var __spread = (this && this.__spread) || function () {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 var index_1 = require("../data/index");
+var utils_1 = require("./executors/utils");
 var arithmetic = require("./op_list/arithmetic.json");
 var basicMath = require("./op_list/basic_math.json");
+var control = require("./op_list/control.json");
 var convolution = require("./op_list/convolution.json");
 var creation = require("./op_list/creation.json");
 var graph = require("./op_list/graph.json");
@@ -29207,11 +29669,10 @@ var normalization = require("./op_list/normalization.json");
 var reduction = require("./op_list/reduction.json");
 var sliceJoin = require("./op_list/slice_join.json");
 var transformation = require("./op_list/transformation.json");
-var image = require("./op_list/image.json");
-var CONTROL_FLOW_OPS = ['Switch', 'Merge', 'Enter', 'Exit', 'Next'];
+var CONTROL_FLOW_OPS = ['Switch', 'Merge', 'Enter', 'Exit', 'NextIteration'];
 var OperationMapper = (function () {
     function OperationMapper() {
-        var mappersJson = __spread(arithmetic, basicMath, convolution, creation, logical, graph, matrices, normalization, reduction, sliceJoin, transformation, image);
+        var mappersJson = __spread(arithmetic, basicMath, control, convolution, creation, logical, graph, matrices, normalization, reduction, sliceJoin, transformation);
         this.opMappers = mappersJson.reduce(function (map, mapper) {
             map[mapper.tfOpName] = mapper;
             return map;
@@ -29245,8 +29706,9 @@ var OperationMapper = (function () {
         Object.keys(nodes).forEach(function (key) {
             var node = nodes[key];
             node.inputNames.forEach(function (name) {
-                node.inputs.push(nodes[name]);
-                nodes[name].children.push(node);
+                var _a = __read(utils_1.getNodeNameAndIndex(name), 1), nodeName = _a[0];
+                node.inputs.push(nodes[nodeName]);
+                nodes[nodeName].children.push(node);
             });
             if (node.inputs.length === 0)
                 inputs.push(node);
@@ -29268,7 +29730,8 @@ var OperationMapper = (function () {
             name: node.name,
             op: mapper.dlOpName,
             category: mapper.category,
-            inputNames: node.input || [],
+            inputNames: (node.input ||
+                []).map(function (input) { return input.startsWith('^') ? input.substr(1) : input; }),
             inputs: [],
             children: [],
             params: {}
@@ -29363,11 +29826,11 @@ var OperationMapper = (function () {
 }());
 exports.OperationMapper = OperationMapper;
 
-},{"../data/index":123,"./op_list/arithmetic.json":142,"./op_list/basic_math.json":143,"./op_list/convolution.json":144,"./op_list/creation.json":145,"./op_list/graph.json":146,"./op_list/image.json":147,"./op_list/logical.json":148,"./op_list/matrices.json":149,"./op_list/normalization.json":150,"./op_list/reduction.json":151,"./op_list/slice_join.json":152,"./op_list/transformation.json":153}],156:[function(require,module,exports){
+},{"../data/index":123,"./executors/utils":142,"./op_list/arithmetic.json":144,"./op_list/basic_math.json":145,"./op_list/control.json":146,"./op_list/convolution.json":147,"./op_list/creation.json":148,"./op_list/graph.json":149,"./op_list/logical.json":150,"./op_list/matrices.json":151,"./op_list/normalization.json":152,"./op_list/reduction.json":153,"./op_list/slice_join.json":154,"./op_list/transformation.json":155}],158:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-var version = '0.1.1';
+var version = '0.1.2';
 exports.version = version;
 
-},{}]},{},[127])(127)
+},{}]},{},[128])(128)
 });
