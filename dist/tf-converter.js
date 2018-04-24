@@ -26818,7 +26818,7 @@ exports.executeOp = function (node, tensorMap, context) {
             var dataFormat = utils_1.getParamValue('dataFormat', node, tensorMap, context)
                 .toUpperCase();
             var dilations = utils_1.getParamValue('dilations', node, tensorMap, context);
-            return [tfc.conv2d(utils_1.getParamValue('x', node, tensorMap, context), utils_1.getParamValue('filter', node, tensorMap, context), [stride[1], stride[2]], pad, dataFormat, [dilations[0], dilations[1]])];
+            return [tfc.conv2d(utils_1.getParamValue('x', node, tensorMap, context), utils_1.getParamValue('filter', node, tensorMap, context), [stride[1], stride[2]], pad, dataFormat, [dilations[1], dilations[2]])];
         }
         case 'conv2dTranspose': {
             var shape = utils_1.getParamValue('outputShape', node, tensorMap, context);
@@ -26838,7 +26838,7 @@ exports.executeOp = function (node, tensorMap, context) {
             var dilations = utils_1.getParamValue('dilations', node, tensorMap, context);
             var dataFormat = utils_1.getParamValue('dataFormat', node, tensorMap, context)
                 .toUpperCase();
-            return [tfc.depthwiseConv2d(utils_1.getParamValue('input', node, tensorMap, context), utils_1.getParamValue('filter', node, tensorMap, context), [stride[1], stride[2]], pad, dataFormat, [dilations[0], dilations[1]])];
+            return [tfc.depthwiseConv2d(utils_1.getParamValue('input', node, tensorMap, context), utils_1.getParamValue('filter', node, tensorMap, context), [stride[1], stride[2]], pad, dataFormat, [dilations[1], dilations[2]])];
         }
         case 'avgPool': {
             var stride = utils_1.getParamValue('strides', node, tensorMap, context);
@@ -27123,9 +27123,9 @@ exports.executeOp = function (node, tensorMap, context) {
         }
         case 'split': {
             var axis = utils_1.getParamValue('axis', node, tensorMap, context);
-            var input = utils_1.getParamValue('x', node, tensorMap, context);
-            var numOrSizeSplits = utils_1.getParamValue('numOrSizeSplits', node, tensorMap, context);
-            return tfc.split(input, numOrSizeSplits, axis);
+            var x = utils_1.getParamValue('x', node, tensorMap, context);
+            var numOrSizeSplits = utils_1.getParamValue('numSplit', node, tensorMap, context);
+            return tfc.split(x, numOrSizeSplits, axis);
         }
         case 'stack': {
             var axis = utils_1.getParamValue('axis', node, tensorMap, context);
@@ -27163,7 +27163,10 @@ exports.executeOp = function (node, tensorMap, context) {
             return [tfc.reshape(utils_1.getParamValue('x', node, tensorMap, context), utils_1.getParamValue('shape', node, tensorMap, context))];
         }
         case 'pad': {
-            return [tfc.pad(utils_1.getParamValue('x', node, tensorMap, context), utils_1.split(utils_1.getParamValue('padding', node, tensorMap, context), 2), utils_1.getParamValue('constantValue', node, tensorMap, context))];
+            var c = utils_1.getParamValue('constantValue', node, tensorMap, context);
+            if (c === -Infinity)
+                c = -1000;
+            return [tfc.pad(utils_1.getParamValue('x', node, tensorMap, context), utils_1.split(utils_1.getParamValue('padding', node, tensorMap, context), 2), c)];
         }
         default:
             throw TypeError("Node type " + node.op + " is not implemented");
@@ -28234,8 +28237,8 @@ module.exports=[
     "params": [
       {
         "tfInputIndex": 0,
-        "dlParamName": "x",
-        "type": "tensor"
+        "dlParamName": "outputShape",
+        "type": "number[]"
       },
       {
         "tfInputIndex": 1,
@@ -28243,9 +28246,9 @@ module.exports=[
         "type": "tensor"
       },
       {
-        "tfParamName": "output_shape",
-        "dlParamName": "outputShape",
-        "type": "number[]"
+        "tfInputIndex": 2,
+        "dlParamName": "x",
+        "type": "tensor"
       },
       {
         "tfParamName": "strides",
@@ -29303,20 +29306,19 @@ module.exports=[
     "category": "slice_join",
     "params": [
       {
-        "tfInputIndex": 0,
+        "tfInputIndex": 1,
         "dlParamName": "x",
         "type": "tensor"
       },
       {
-        "tfInputIndex": 1,
-        "dlParamName": "numOrSizeSplits",
-        "type": "tensor"
+        "tfInputIndex": 0,
+        "dlParamName": "axis",
+        "type": "number"
       },
       {
-        "tfParamName": "axis",
-        "dlParamName": "axis",
-        "type": "number",
-        "defaultValue": 0
+        "tfParamName": "num_split",
+        "dlParamName": "numSplit",
+        "type": "number"
       }
     ]
   },
@@ -29790,7 +29792,7 @@ var OperationMapper = (function () {
     };
     OperationMapper.prototype.getNumberParam = function (attrs, name, def) {
         var param = attrs[name];
-        return (param ? ((param.f !== undefined) ? param.f : param.i) : def);
+        return (param ? ((param.i !== undefined) ? param.i : param.f) : def);
     };
     OperationMapper.prototype.getDtypeParam = function (attrs, name, def) {
         var param = attrs[name];

@@ -216,8 +216,8 @@
     "params": [
       {
         "tfInputIndex": 0,
-        "dlParamName": "x",
-        "type": "tensor"
+        "dlParamName": "outputShape",
+        "type": "number[]"
       },
       {
         "tfInputIndex": 1,
@@ -225,9 +225,9 @@
         "type": "tensor"
       },
       {
-        "tfParamName": "output_shape",
-        "dlParamName": "outputShape",
-        "type": "number[]"
+        "tfInputIndex": 2,
+        "dlParamName": "x",
+        "type": "tensor"
       },
       {
         "tfParamName": "strides",

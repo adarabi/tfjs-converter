@@ -27,9 +27,9 @@ exports.executeOp = function (node, tensorMap, context) {
         }
         case 'split': {
             var axis = utils_1.getParamValue('axis', node, tensorMap, context);
-            var input = utils_1.getParamValue('x', node, tensorMap, context);
-            var numOrSizeSplits = utils_1.getParamValue('numOrSizeSplits', node, tensorMap, context);
-            return tfc.split(input, numOrSizeSplits, axis);
+            var x = utils_1.getParamValue('x', node, tensorMap, context);
+            var numOrSizeSplits = utils_1.getParamValue('numSplit', node, tensorMap, context);
+            return tfc.split(x, numOrSizeSplits, axis);
         }
         case 'stack': {
             var axis = utils_1.getParamValue('axis', node, tensorMap, context);

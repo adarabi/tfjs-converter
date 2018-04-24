@@ -155,7 +155,7 @@ var OperationMapper = (function () {
     };
     OperationMapper.prototype.getNumberParam = function (attrs, name, def) {
         var param = attrs[name];
-        return (param ? ((param.f !== undefined) ? param.f : param.i) : def);
+        return (param ? ((param.i !== undefined) ? param.i : param.f) : def);
     };
     OperationMapper.prototype.getDtypeParam = function (attrs, name, def) {
         var param = attrs[name];

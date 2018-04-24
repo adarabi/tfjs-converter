@@ -18,7 +18,7 @@ exports.executeOp = function (node, tensorMap, context) {
             var dataFormat = utils_1.getParamValue('dataFormat', node, tensorMap, context)
                 .toUpperCase();
             var dilations = utils_1.getParamValue('dilations', node, tensorMap, context);
-            return [tfc.conv2d(utils_1.getParamValue('x', node, tensorMap, context), utils_1.getParamValue('filter', node, tensorMap, context), [stride[1], stride[2]], pad, dataFormat, [dilations[0], dilations[1]])];
+            return [tfc.conv2d(utils_1.getParamValue('x', node, tensorMap, context), utils_1.getParamValue('filter', node, tensorMap, context), [stride[1], stride[2]], pad, dataFormat, [dilations[1], dilations[2]])];
         }
         case 'conv2dTranspose': {
             var shape = utils_1.getParamValue('outputShape', node, tensorMap, context);
@@ -38,7 +38,7 @@ exports.executeOp = function (node, tensorMap, context) {
             var dilations = utils_1.getParamValue('dilations', node, tensorMap, context);
             var dataFormat = utils_1.getParamValue('dataFormat', node, tensorMap, context)
                 .toUpperCase();
-            return [tfc.depthwiseConv2d(utils_1.getParamValue('input', node, tensorMap, context), utils_1.getParamValue('filter', node, tensorMap, context), [stride[1], stride[2]], pad, dataFormat, [dilations[0], dilations[1]])];
+            return [tfc.depthwiseConv2d(utils_1.getParamValue('input', node, tensorMap, context), utils_1.getParamValue('filter', node, tensorMap, context), [stride[1], stride[2]], pad, dataFormat, [dilations[1], dilations[2]])];
         }
         case 'avgPool': {
             var stride = utils_1.getParamValue('strides', node, tensorMap, context);

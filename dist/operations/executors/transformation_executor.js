@@ -19,7 +19,10 @@ exports.executeOp = function (node, tensorMap, context) {
             return [tfc.reshape(utils_1.getParamValue('x', node, tensorMap, context), utils_1.getParamValue('shape', node, tensorMap, context))];
         }
         case 'pad': {
-            return [tfc.pad(utils_1.getParamValue('x', node, tensorMap, context), utils_1.split(utils_1.getParamValue('padding', node, tensorMap, context), 2), utils_1.getParamValue('constantValue', node, tensorMap, context))];
+            var c = utils_1.getParamValue('constantValue', node, tensorMap, context);
+            if (c === -Infinity)
+                c = -1000;
+            return [tfc.pad(utils_1.getParamValue('x', node, tensorMap, context), utils_1.split(utils_1.getParamValue('padding', node, tensorMap, context), 2), c)];
         }
         default:
             throw TypeError("Node type " + node.op + " is not implemented");
