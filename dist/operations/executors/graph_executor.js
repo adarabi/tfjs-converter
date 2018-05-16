@@ -12,6 +12,9 @@ exports.executeOp = function (node, tensorMap, context) {
             return [utils_1.getTensor(node.name, tensorMap, context) || def];
         case 'identity':
             return [utils_1.getParamValue('x', node, tensorMap, context)];
+        case 'snapshot':
+            var snapshot = utils_1.getParamValue('x', node, tensorMap, context);
+            return [snapshot.clone()];
         case 'shape':
             return [tfc.tensor1d(utils_1.getParamValue('x', node, tensorMap, context).shape, 'int32')];
         case 'noop':
